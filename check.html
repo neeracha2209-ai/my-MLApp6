@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Image Check Website</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- TensorFlow & Teachable Machine -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #74ebd5, #acb6e5);
+        }
+
+        /* Navigation */
+        nav {
+            background: #1f2937;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+        }
+
+        nav button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        nav button:hover {
+            text-decoration: underline;
+        }
+
+        /* Page layout */
+        .page {
+            display: none;
+            min-height: calc(100vh - 60px);
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        .card {
+            background: white;
+            max-width: 420px;
+            width: 100%;
+            padding: 30px;
+            border-radius: 18px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+
+        p {
+            font-size: 15px;
+            color: #374151;
+            line-height: 1.6;
+        }
+
+        label.upload-btn {
+            display: inline-block;
+            padding: 10px 18px;
+            background: #22c55e;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        label.upload-btn:hover {
+            background: #16a34a;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f3f4f6;
+        }
+
+        .class-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1d4ed8;
+        }
+
+        .prob {
+            margin-top: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Navigation -->
+<nav>
+    <button onclick="showPage('home')">Home</button>
+    <button onclick="showPage('check')">Check</button>
+    <button onclick="showPage('about')">About Us</button>
+</nav>
+
+<!-- Home Page -->
+<section id="home" class="page active">
+    <div class="card">
+        <h1>Home</h1>
+        <p>
+            ยินดีต้อนรับสู่เว็บไซต์ตรวจสอบภาพด้วย AI  
+            ระบบนี้ใช้ Teachable Machine  
+            และออกแบบให้รองรับทุกอุปกรณ์
+        </p>
+    </div>
+</section>
+
+<!-- Check Page -->
+<section id="check" class="page">
+    <div class="card">
+        <h1>Check Image</h1>
+
+        <label for="imageUpload" class="upload-btn">เลือกภาพ</label>
+        <input type="file" id="imageUpload" accept="image/*" onchange="loadImage(event)">
+
+        <div id="result" class="result">
+            กำลังโหลดโมเดล...
+        </div>
+    </div>
+</section>
+
+<!-- About Us Page -->
+<section id="about" class="page">
+    <div class="card">
+        <h1>About Us</h1>
+        <p>
+            เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษา  
+            ใช้ AI ในการจำแนกรูปภาพ  
+            เน้นความเรียบง่ายและใช้งานจริง
+        </p>
+    </div>
+</section>
+
+<script>
+    /* เปลี่ยนหน้า */
+    function showPage(pageId) {
+        document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+        document.getElementById(pageId).classList.add("active");
+    }
+
+    /* Teachable Machine */
+    const URL = "https://teachablemachine.withgoogle.com/models/TYCyeUC4_/";
+    let model;
+
+    async function loadModel() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmImage.load(modelURL, metadataURL);
+        document.getElementById("result").innerHTML =
+            "เลือกภาพเพื่อเริ่มตรวจสอบ";
+    }
+
+    // โหลดโมเดลอัตโนมัติเมื่อเปิดเว็บ
+    loadModel();
+
+    function loadImage(event) {
+        const file = event.target.files[0];
+        if (!file || !model) return;
+
+        const reader = new FileReader();
+        reader.onload = function () {
+            const img = new Image();
+            img.src = reader.result;
+            img.onload = () => predict(img);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function predict(img) {
+        const predictions = await model.predict(img);
+
+        let best = predictions[0];
+        for (let i = 1; i < predictions.length; i++) {
+            if (predictions[i].probability > best.probability) {
+                best = predictions[i];
+            }
+        }
+
+        document.getElementById("result").innerHTML = `
+            <div class="class-name">${best.className}</div>
+            <div class="prob">
+                ความน่าจะเป็น ${(best.probability * 100).toFixed(2)}%
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
